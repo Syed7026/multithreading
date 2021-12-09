@@ -1,0 +1,83 @@
+
+#include <iostream>
+#include <thread>
+#include <mutex>
+#include <bits/stdc++.h>
+#include <vector>
+#include <unordered_map>
+#include <queue>
+#include <tuple>
+#include <chrono>
+
+using namespace std;
+using namespace std::chrono;
+
+mutex mtx;
+vector<thread> threadPool;
+unordered_map < int, vector < int >> adjList;
+unordered_map < int, int > nodeToCostMap;
+queue < tuple < int, int >> activeNodeCostQueue;
+int source = 3;
+
+int main() {
+    for (int i = 0; i < 10; i++) {
+        string input;
+        getline(cin, input);
+
+        stringstream ss(input);
+        string word;
+        int temp[2];
+        int idx = 0;
+        while (ss >> word) {
+            temp[idx++] = std::stoi(word);
+        }
+
+        if (adjList.find(temp[0]) == adjList.end()) {
+            vector < int > t;
+            adjList[temp[0]] = t;
+        }
+        // if (adjList.find(temp[1]) == adjList.end()) {
+        //     vector < int > t;
+        //     adjList[temp[1]] = t;
+        // }
+
+        adjList.at(temp[0]).push_back(temp[1]);
+        // adjList.at(temp[1]).push_back(temp[0]);
+    }
+
+    auto start = high_resolution_clock::now();
+
+      auto calculateShortestPath =[](int node, int cost){
+        if (nodeToCostMap.find(node) == nodeToCostMap.end() || cost < nodeToCostMap.at(node)) {
+            nodeToCostMap[node] = cost;
+            for (auto i = adjList[node].begin(); i != adjList[node].end(); ++i)
+                activeNodeCostQueue.push(make_tuple( * i, cost + 1));
+        }
+      };
+
+    activeNodeCostQueue.push(make_tuple(source, 0));
+    
+    while(!activeNodeCostQueue.empty()){
+      while(threadPool.size()<2*thread::hardware_concurrency() && !activeNodeCostQueue.empty()) {
+        tuple < int, int > nodeCostTuple = activeNodeCostQueue.front();
+        activeNodeCostQueue.pop();
+        
+        int node = get < 0 > (nodeCostTuple);
+        int cost = get < 1 > (nodeCostTuple);
+        
+        thread th(calculateShortestPath, node, cost);
+        th.join();
+      }
+    }
+
+    
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast < microseconds > (stop - start);
+    cout << "Time taken by function: " <<
+        duration.count() << " microseconds" << endl;
+
+    for (auto x: nodeToCostMap)
+        cout << x.first << " " << x.second << endl;
+
+    return 0;
+}
